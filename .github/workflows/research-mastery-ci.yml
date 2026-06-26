@@ -1,0 +1,23 @@
+name: Research mastery validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m compileall scripts
+      - run: python scripts/codex_orchestrator.py validate
+      - run: python scripts/build_research_mastery_status.py --check
+      - run: python scripts/validate_research_mastery.py
