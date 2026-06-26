@@ -1,0 +1,73 @@
+name: Codex continuous medical research system
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+concurrency:
+  group: codex-continuous-medical-research
+  cancel-in-progress: false
+
+jobs:
+  codex:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Check whether Codex is enabled
+        id: preflight
+        shell: bash
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "${OPENAI_KEY}" ]]; then
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::Set OPENAI_API_KEY to enable Codex execution."
+          else
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.preflight.outputs.enabled == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.preflight.outputs.enabled == 'true'
+        with:
+          python-version: "3.12"
+      - name: Show selected task
+        if: steps.preflight.outputs.enabled == 'true'
+        run: |
+          python scripts/codex_orchestrator.py validate
+          python scripts/codex_orchestrator.py next || true
+      - name: Run Codex
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/continuous-medical-research-system.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          effort: high
+      - name: Validate and rebuild status
+        if: steps.preflight.outputs.enabled == 'true'
+        run: |
+          python -m compileall scripts
+          python scripts/codex_orchestrator.py validate
+          python scripts/build_research_mastery_status.py
+          python scripts/validate_research_mastery.py
+          python scripts/build_research_mastery_status.py --check
+      - name: Commit Codex checkpoint
+        if: steps.preflight.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          git config user.name "codex-continuous[bot]"
+          git config user.email "codex-continuous[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Codex continuous: advance medical research mastery system"
+          git push
