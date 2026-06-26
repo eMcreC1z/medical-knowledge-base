@@ -9,6 +9,9 @@ concurrency:
   group: codex-continuous-medical-research
   cancel-in-progress: false
 
+env:
+  WORK_BRANCH: codex/medical-research-queue
+
 jobs:
   codex:
     runs-on: ubuntu-latest
@@ -32,6 +35,8 @@ jobs:
           fi
       - uses: actions/checkout@v5
         if: steps.preflight.outputs.enabled == 'true'
+        with:
+          ref: ${{ env.WORK_BRANCH }}
       - uses: actions/setup-python@v5
         if: steps.preflight.outputs.enabled == 'true'
         with:
@@ -70,4 +75,4 @@ jobs:
             exit 0
           fi
           git commit -m "Codex continuous: advance medical research mastery system"
-          git push
+          git push origin "HEAD:${WORK_BRANCH}"
